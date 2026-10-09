@@ -185,7 +185,33 @@ func extractTextContent(msg *waProto.Message) string {
 		return extendedText.GetText()
 	}
 
-	// For now, we're ignoring non-text messages
+	// Media messages carry their text in a caption field. Without this the
+	// caption is lost for good: it is never written to messages.db, so a photo
+	// that says who is on it arrives as an empty message.
+	if img := msg.GetImageMessage(); img != nil {
+		return img.GetCaption()
+	}
+	if vid := msg.GetVideoMessage(); vid != nil {
+		return vid.GetCaption()
+	}
+	if doc := msg.GetDocumentMessage(); doc != nil {
+		return doc.GetCaption()
+	}
+
+	// Wrappers that hold the real message one level down.
+	if wrapped := msg.GetDocumentWithCaptionMessage().GetMessage(); wrapped != nil {
+		return extractTextContent(wrapped)
+	}
+	if wrapped := msg.GetViewOnceMessage().GetMessage(); wrapped != nil {
+		return extractTextContent(wrapped)
+	}
+	if wrapped := msg.GetViewOnceMessageV2().GetMessage(); wrapped != nil {
+		return extractTextContent(wrapped)
+	}
+	if wrapped := msg.GetEphemeralMessage().GetMessage(); wrapped != nil {
+		return extractTextContent(wrapped)
+	}
+
 	return ""
 }
 
@@ -666,17 +692,21 @@ func extractDirectPathFromURL(url string) string {
 		return url // Return original URL if parsing fails
 	}
 
-	pathPart := parts[1]
-
-	// Remove query parameters
-	pathPart = strings.SplitN(pathPart, "?", 2)[0]
-
-	// Create proper direct path format
-	return "/" + pathPart
+	// Keep the query string: WhatsApp direct paths include the signed
+	// auth parameters (oh=/oe=). whatsmeow appends "&hash=..." to the
+	// direct path, so stripping the query yields a 403 from the CDN.
+	return "/" + parts[1]
 }
 
 // Start a REST API server to expose the WhatsApp client functionality
 func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port int) {
+	// Handler for "delete for me" (see delete.go)
+	registerDeleteForMeHandler(client, messageStore)
+	// Handlers for older history and media re-upload (see history.go)
+	registerHistoryHandlers(client, messageStore)
+	// Handler for a full app state resync (see resync.go)
+	registerResyncHandler(client)
+
 	// Handler for sending messages
 	http.HandleFunc("/api/send", func(w http.ResponseWriter, r *http.Request) {
 		// Only allow POST requests
@@ -844,6 +874,12 @@ func main() {
 		case *events.HistorySync:
 			// Process history sync events
 			handleHistorySync(client, messageStore, v, logger)
+
+		case *events.MediaRetry:
+			handleMediaRetry(messageStore, v, logger)
+
+		case *events.DeleteForMe:
+			logDeleteForMe(v, logger)
 
 		case *events.Connected:
 			logger.Infof("Connected to WhatsApp")
@@ -1077,11 +1113,7 @@ func handleHistorySync(client *whatsmeow.Client, messageStore *MessageStore, his
 				// Extract text content
 				var content string
 				if msg.Message.Message != nil {
-					if conv := msg.Message.Message.GetConversation(); conv != "" {
-						content = conv
-					} else if ext := msg.Message.Message.GetExtendedTextMessage(); ext != nil {
-						content = ext.GetText()
-					}
+					content = extractTextContent(msg.Message.Message)
 				}
 
 				// Extract media info

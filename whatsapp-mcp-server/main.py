@@ -12,7 +12,8 @@ from whatsapp import (
     send_message as whatsapp_send_message,
     send_file as whatsapp_send_file,
     send_audio_message as whatsapp_audio_voice_message,
-    download_media as whatsapp_download_media
+    download_media as whatsapp_download_media,
+    delete_messages_for_me as whatsapp_delete_messages_for_me
 )
 
 # Initialize FastMCP server
@@ -245,6 +246,25 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
             "success": False,
             "message": "Failed to download media"
         }
+
+@mcp.tool()
+def delete_messages_for_me(chat_jid: str, message_ids: List[str], delete_media: bool = True) -> Dict[str, Any]:
+    """Delete one or more messages "for me" (like "Delete for me" on the phone).
+
+    The deletion is synced to the phone and all linked devices, so the messages
+    disappear from Arjan's own WhatsApp. Other chat members are not affected.
+    This cannot be undone: only use it on an explicit request, and archive the
+    media first if it should be kept.
+
+    Args:
+        chat_jid: The JID of the chat containing the messages
+        message_ids: The IDs of the messages to delete (all in this chat)
+        delete_media: Also remove the photo/video files from the phone (default True)
+
+    Returns:
+        A dictionary with success, a summary message and a result per message ID
+    """
+    return whatsapp_delete_messages_for_me(chat_jid, message_ids, delete_media)
 
 if __name__ == "__main__":
     # Initialize and run the server
