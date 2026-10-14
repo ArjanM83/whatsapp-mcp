@@ -13,7 +13,8 @@ from whatsapp import (
     send_file as whatsapp_send_file,
     send_audio_message as whatsapp_audio_voice_message,
     download_media as whatsapp_download_media,
-    delete_messages_for_me as whatsapp_delete_messages_for_me
+    delete_messages_for_me as whatsapp_delete_messages_for_me,
+    archive_chat as whatsapp_archive_chat
 )
 
 # Initialize FastMCP server
@@ -265,6 +266,22 @@ def delete_messages_for_me(chat_jid: str, message_ids: List[str], delete_media: 
         A dictionary with success, a summary message and a result per message ID
     """
     return whatsapp_delete_messages_for_me(chat_jid, message_ids, delete_media)
+
+@mcp.tool()
+def archive_chat(chat_jid: str, archive: bool = True) -> Dict[str, Any]:
+    """Archive a chat (like swiping it to "Archive" on the phone), or unarchive it.
+
+    The change is synced to the phone and all linked devices. Only use it on
+    an explicit request.
+
+    Args:
+        chat_jid: The JID of the chat to archive
+        archive: True to archive (default), False to unarchive
+
+    Returns:
+        A dictionary with success and a message
+    """
+    return whatsapp_archive_chat(chat_jid, archive)
 
 if __name__ == "__main__":
     # Initialize and run the server

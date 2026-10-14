@@ -706,6 +706,8 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 	registerHistoryHandlers(client, messageStore)
 	// Handler for a full app state resync (see resync.go)
 	registerResyncHandler(client)
+	// Handler for archiving a chat (see archive.go)
+	registerArchiveHandler(client, messageStore)
 
 	// Handler for sending messages
 	http.HandleFunc("/api/send", func(w http.ResponseWriter, r *http.Request) {

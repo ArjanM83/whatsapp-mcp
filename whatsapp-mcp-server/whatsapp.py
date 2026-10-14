@@ -784,3 +784,22 @@ def delete_messages_for_me(chat_jid: str, message_ids: List[str], delete_media: 
             return {"success": False, "message": f"HTTP {response.status_code}: {response.text}"}
     except requests.RequestException as e:
         return {"success": False, "message": f"Request error: {str(e)}"}
+
+
+def archive_chat(chat_jid: str, archive: bool = True) -> dict:
+    """Archive (or unarchive) a chat through the bridge (synced to the phone).
+
+    Returns the bridge response: success and message.
+    """
+    try:
+        response = requests.post(
+            f"{WHATSAPP_API_BASE_URL}/archive_chat",
+            json={"chat_jid": chat_jid, "archive": archive},
+            timeout=60,
+        )
+        try:
+            return response.json()
+        except json.JSONDecodeError:
+            return {"success": False, "message": f"HTTP {response.status_code}: {response.text}"}
+    except requests.RequestException as e:
+        return {"success": False, "message": f"Request error: {str(e)}"}
